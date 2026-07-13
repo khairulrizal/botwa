@@ -245,10 +245,28 @@ async def main():
         except Exception as e:
             print(f'Error in message handler: {e}')
     
-    # Register event handler
+    # Connection handler
+    async def on_connection(update):
+        if 'qr' in update:
+            qr_data = update['qr']
+            print('========================================')
+            print('QR CODE - Scan with WhatsApp app')
+            print('========================================')
+            qr = qrcode.QRCode(version=1, box_size=1, border=1)
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            qr.print_ascii(invert=True)
+            print('========================================')
+            print('Buka WhatsApp → Linked Devices → Link a Device')
+            print('Scan QR code di atas')
+            print('========================================')
+        if update.get('connection') == 'open':
+            print('Bot connected successfully!')
+        if update.get('connection') == 'close':
+            print('Connection closed. Reconnecting...')
+
+    # Register event handlers
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
-    
-    # Register connection handler
     client.events.on(WAEventType.CONNECTION_UPDATE, on_connection)
     
     # Start client
