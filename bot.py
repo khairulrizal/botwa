@@ -255,8 +255,13 @@ async def main():
                                 await client.send_text(chat_id, reply)
                                 print(f'Replied to {sender}', flush=True)
                         except Exception as e:
+                            import traceback
                             print(f'Error handling command: {e}', flush=True)
-                            await client.send_text(chat_id, f'Error: {str(e)}')
+                            traceback.print_exc()
+                            try:
+                                await client.send_text(chat_id, f'Error: {str(e)}')
+                            except Exception as e2:
+                                print(f'Failed to send error reply: {e2}', flush=True)
                     return
                 
                 # Auto-reply
