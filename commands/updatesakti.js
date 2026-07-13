@@ -18,14 +18,30 @@ const writeData = (data) => {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 4), 'utf8');
 };
 
+const normalizeNumber = (num) => {
+    // Remove @s.whatsapp.net or @g.us
+    let cleaned = num.replace(/@.*$/, '');
+    // Remove leading + if present
+    cleaned = cleaned.replace(/^\+/, '');
+    // Convert 08xx to 628xx
+    if (cleaned.startsWith('08')) {
+        cleaned = '62' + cleaned.substring(1);
+    }
+    return cleaned;
+};
+
 module.exports = {
     name: 'updatesakti',
     description: 'Update data akun sakti (admin only)',
     execute: (sock, message, args, context) => {
         const sender = message.key.participant || message.key.remoteJid;
-        const senderNumber = sender.replace(/@.*$/, '');
+        const senderNumber = normalizeNumber(sender);
+
+        console.log('[UPDATESAKTI] Sender:', sender, '-> Normalized:', senderNumber);
+        console.log('[UPDATESAKTI] Admin list:', ADMIN_NUMBERS);
 
         if (!ADMIN_NUMBERS.includes(senderNumber)) {
+            console.log('[UPDATESAKTI] Access denied for:', senderNumber);
             return 'Hanya admin yang bisa mengupdate data!';
         }
 
