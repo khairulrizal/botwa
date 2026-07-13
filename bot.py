@@ -227,7 +227,11 @@ async def main():
 
     def save_auth(c):
         AUTH_FILE.write_text(c.to_json())
-        print('Auth updated. Copy this PIWAPP_AUTH_B64 to Railway env var:', flush=True)
+        # Also persist keys
+        keys_path = Path('piwapp_auth.json.keys')
+        if keys_path.exists():
+            keys_data = base64.b64encode(keys_path.read_bytes()).decode()
+            print(f'KEYS_B64={keys_data}', flush=True)
         print(f'PIWAPP_AUTH_B64={base64.b64encode(c.to_json().encode()).decode()}', flush=True)
 
     if AUTH_FILE.exists():
@@ -240,6 +244,13 @@ async def main():
         print('Creating new auth...', flush=True)
         creds = AuthenticationCreds.initial()
         AUTH_FILE.write_text(creds.to_json())
+
+    # Restore keys from env var if available
+    keys_env = os.getenv('KEYS_B64')
+    if keys_env:
+        keys_path = Path('piwapp_auth.json.keys')
+        keys_path.write_bytes(base64.b64decode(keys_env))
+        print('Restored keys from env var', flush=True)
 
     print('Initializing piwapp client...', flush=True)
     client = Client(
@@ -311,7 +322,9 @@ async def main():
             print('Bot connected!', flush=True)
         if update.get('connection') == 'close':
             qr_status[0] = 'waiting'
-            print('Connection closed. Reconnecting...', flush=True)
+            reason = update.get('reason', 'unknown')
+            logged_out = update.get('logged_out', False)
+            print(f'Connection closed. reason={reason} logged_out={logged_out}. Reconnecting...', flush=True)
 
     client.on("connection.update", on_connection)
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
