@@ -249,21 +249,26 @@ async def main():
     async def on_connection(update):
         if 'qr' in update:
             qr_data = update['qr']
-            print('========================================')
-            print('QR CODE - Scan with WhatsApp app')
-            print('========================================')
-            qr = qrcode.QRCode(version=1, box_size=1, border=1)
+            print('', flush=True)
+            print('=' * 40, flush=True)
+            print('  SCAN QR CODE INI DENGAN WHATSAPP', flush=True)
+            print('=' * 40, flush=True)
+            qr = qrcode.QRCode(version=1, box_size=1, border=2)
             qr.add_data(qr_data)
             qr.make(fit=True)
-            qr.print_ascii(invert=True)
-            print('========================================')
-            print('Buka WhatsApp → Linked Devices → Link a Device')
-            print('Scan QR code di atas')
-            print('========================================')
+            matrix = qr.get_matrix()
+            for row in matrix:
+                line = ''.join('██' if cell else '  ' for cell in row)
+                print(line, flush=True)
+            print('=' * 40, flush=True)
+            print('Buka WhatsApp → Linked Devices', flush=True)
+            print('→ Link a Device → Scan QR di atas', flush=True)
+            print('=' * 40, flush=True)
+            print('', flush=True)
         if update.get('connection') == 'open':
-            print('Bot connected successfully!')
+            print('Bot connected successfully!', flush=True)
         if update.get('connection') == 'close':
-            print('Connection closed. Reconnecting...')
+            print('Connection closed. Reconnecting...', flush=True)
 
     # Register event handlers
     client.on("connection.update", on_connection)
