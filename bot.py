@@ -327,7 +327,17 @@ async def main():
             print(f'Connection closed. reason={reason} logged_out={logged_out}. Reconnecting...', flush=True)
 
     client.on("connection.update", on_connection)
+    async def on_messages_update(payload):
+        try:
+            if isinstance(payload, dict) and 'decryptError' in payload:
+                print(f'DECRYPT FAILED: {payload["decryptError"]} jid={payload.get("key", {}).get("remoteJid")}', flush=True)
+            else:
+                print(f'MESSAGES_UPDATE: {payload}', flush=True)
+        except Exception as e:
+            print(f'Error in update handler: {e}', flush=True)
+
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
+    client.events.on(WAEventType.MESSAGES_UPDATE, on_messages_update)
 
     print('Starting bot...', flush=True)
     await client.start()
