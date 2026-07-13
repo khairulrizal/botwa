@@ -22,6 +22,8 @@ const startBot = async () => {
         auth: state,
     });
 
+    let pairingRequested = false;
+
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
@@ -35,6 +37,7 @@ const startBot = async () => {
             log('warn', `Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
 
             if (shouldReconnect) {
+                pairingRequested = false;
                 startBot();
             } else {
                 log('error', 'Logged out. Please delete auth_info_baileys and re-scan QR.');
@@ -42,19 +45,24 @@ const startBot = async () => {
             }
         } else if (connection === 'open') {
             log('info', 'Bot connected successfully!');
+            
+            // Request pairing code for first-time setup
+            if (!state.creds.registered && !pairingRequested) {
+                pairingRequested = true;
+                try {
+                    const phoneNumber = '62895329678069';
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    log('info', '========================================');
+                    log('info', `PAIRING CODE: ${code}`);
+                    log('info', '========================================');
+                    log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
+                    log('info', 'Masukkan kode di atas');
+                } catch (err) {
+                    log('error', 'Failed to request pairing code:', err.message);
+                }
+            }
         }
     });
-
-    // Request pairing code for first-time setup
-    if (!state.creds.registered) {
-        const phoneNumber = '62895329678069';
-        const code = await sock.requestPairingCode(phoneNumber);
-        log('info', '========================================');
-        log('info', `PAIRING CODE: ${code}`);
-        log('info', '========================================');
-        log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
-        log('info', 'Masukkan kode di atas');
-    }
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -117,39 +125,6 @@ const startBot = async () => {
                     await sock.sendMessage(chatId, { text: autoReplyResponse });
                     log('info', `Auto-reply triggered for: ${messageText}`);
                     return;
-                }
-
-                const context = {
-                    chatId,
-                    senderId,
-                    isGroup,
-                    message: msg,
-                    startTime: BOT_START_TIME,
-                    commands,
-                };
-
-                log('info', `Message from ${senderId} in ${isGroup ? 'group' : 'private'}: ${messageText}`);
-
-                if (messageText.startsWith('!')) {
-                    const parts = messageText.split(' ');
-                    const commandName = parts[0].slice(1).toLowerCase();
-                    const args = parts.slice(1);
-                    const command = commands[commandName];
-
-                    if (command) {
-                        const start = Date.now();
-                        try {
-                            const reply = await command.execute(sock, msg, args, context);
-                            const elapsed = Date.now() - start;
-                            if (reply) {
-                                await sock.sendMessage(chatId, { text: reply });
-                                log('info', `Command !${commandName} executed in ${elapsed}ms`);
-                            }
-                        } catch (cmdError) {
-                            log('error', `Error executing !${commandName}:`, cmdError.message);
-                            await sock.sendMessage(chatId, { text: `Error: ${cmdError.message}` });
-                        }
-                    }
                 }
             }
         } catch (err) {
