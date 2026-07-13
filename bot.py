@@ -266,8 +266,8 @@ async def main():
             print('Connection closed. Reconnecting...')
 
     # Register event handlers
+    client.on("connection.update", on_connection)
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
-    client.events.on(WAEventType.CONNECTION_UPDATE, on_connection)
     
     # Start client
     print('Starting bot...')
