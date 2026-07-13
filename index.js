@@ -3,6 +3,7 @@ const { loadCommands } = require('./commands');
 const autoreply = require('./commands/autoreply');
 
 const BOT_START_TIME = Date.now();
+const PHONE_NUMBER = '62895329678069';
 
 const log = (level, ...args) => {
     const timestamp = new Date().toISOString();
@@ -20,44 +21,53 @@ const startBot = async () => {
     const sock = makeWASocket({
         version,
         auth: state,
+        printQRInTerminal: false,
+        browser: ['BOT SAKTI', 'Chrome', '1.0.0'],
     });
 
     let pairingRequested = false;
+    let isConnecting = false;
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        // Request pairing code when QR is received (first-time setup)
-        if (qr && !pairingRequested) {
+        log('info', `Connection update: ${connection || 'pending'}`);
+
+        if (qr && !pairingRequested && !isConnecting) {
             pairingRequested = true;
+            isConnecting = true;
             log('info', 'QR Code received. Requesting pairing code...');
             try {
-                const phoneNumber = '62895329678069';
-                const code = await sock.requestPairingCode(phoneNumber);
+                const code = await sock.requestPairingCode(PHONE_NUMBER);
                 log('info', '========================================');
                 log('info', `PAIRING CODE: ${code}`);
                 log('info', '========================================');
                 log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
-                log('info', 'Masukkan kode di atas');
+                log('info', 'Masukkan kode di atas dalam 30 detik');
             } catch (err) {
                 log('error', 'Failed to request pairing code:', err.message);
+                isConnecting = false;
             }
         }
 
         if (connection === 'close') {
+            isConnecting = false;
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            log('warn', `Connection closed (code: ${statusCode}). Reconnecting: ${shouldReconnect}`);
+            log('warn', `Connection closed (code: ${statusCode})`);
 
-            if (shouldReconnect) {
-                pairingRequested = false;
-                startBot();
+            if (statusCode === DisconnectReason.loggedOut) {
+                log('error', 'Logged out. Restart container to re-pair.');
             } else {
-                log('error', 'Logged out. Please delete auth_info_baileys and re-scan QR.');
-                process.exit(1);
+                log('info', 'Reconnecting in 3 seconds...');
+                setTimeout(() => {
+                    pairingRequested = false;
+                    startBot();
+                }, 3000);
             }
         } else if (connection === 'open') {
             log('info', 'Bot connected successfully!');
+            pairingRequested = false;
+            isConnecting = false;
         }
     });
 
@@ -100,7 +110,7 @@ const startBot = async () => {
                             commands,
                         };
 
-                        log('info', `Message from ${senderId} in ${isGroup ? 'group' : 'private'}: ${messageText}`);
+                        log('info', `Command !${commandName} from ${senderId}`);
                         const start = Date.now();
                         try {
                             const reply = await command.execute(sock, msg, args, context);
