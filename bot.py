@@ -163,14 +163,19 @@ def patch_lid_support(client):
                 me_user_jid = jid_encode(me_dec.user, "s.whatsapp.net")
                 recipient = _j.jid_normalized_user(to_jid)
 
-                try:
-                    bundles = ms.parse_prekey_bundles(
-                        await conn.query(ms.build_prekey_fetch([recipient], generate_message_tag())))
-                    ms.inject_sessions(conn.signal_store, bundles)
-                    targets = list(bundles.keys())
-                    print(f'[LID] Pre-key bundles for {recipient}: {targets}', flush=True)
-                except Exception as e:
-                    print(f'[LID] Pre-key fetch failed for {recipient}: {e}', flush=True)
+                targets = []
+                for fetch_jid in [to_jid, recipient]:
+                    try:
+                        bundles = ms.parse_prekey_bundles(
+                            await conn.query(ms.build_prekey_fetch([fetch_jid], generate_message_tag())))
+                        if bundles:
+                            ms.inject_sessions(conn.signal_store, bundles)
+                            targets = list(bundles.keys())
+                            print(f'[LID] Pre-key bundles via {fetch_jid}: {targets}', flush=True)
+                            break
+                    except Exception as e:
+                        print(f'[LID] Pre-key fetch failed for {fetch_jid}: {e}', flush=True)
+                if not targets:
                     targets = [recipient]
 
                 other_nodes, di1 = ms.create_participant_nodes(conn.signal_store, message, targets)
