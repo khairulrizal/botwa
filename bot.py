@@ -145,6 +145,7 @@ def patch_lid_support(client):
         from piwapp.api import messages_send as ms
         from piwapp.api.messages import generate_message_id
         from piwapp.binary import jid_decode, jid_encode
+        from piwapp.utils import generate_message_tag
 
         original_send_text = client.send_text
 
