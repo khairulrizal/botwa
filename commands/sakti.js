@@ -1,48 +1,26 @@
+const fs = require('fs');
+const path = require('path');
+
 module.exports = {
     name: 'sakti',
-    description: 'Tampilkan informasi bot sakti',
+    description: 'Tampilkan data akun sakti terupdate',
     execute: (sock, message, args, context) => {
-        const info = {
-            name: 'BOT SAKTI',
-            version: '1.0.0',
-            creator: 'Khairul Rizal',
-            platform: 'Railway',
-            library: 'Baileys',
-            features: [
-                'Auto-reply by keyword',
-                'Sticker maker',
-                'Tag all members',
-                'Admin commands (kick)',
-                'Multiple commands'
-            ],
-            commands: [
-                '!ping - Cek bot hidup',
-                '!menu - Tampilkan menu',
-                '!alive - Status bot',
-                '!help - Bantuan',
-                '!sakti - Info bot sakti',
-                '!sticker - Buat sticker dari gambar',
-                '!tagall - Mention semua member',
-                '!kick - Kick member (admin)'
-            ],
-            uptime: Math.floor((Date.now() - context.startTime) / 1000),
-            message: 'Bot ini dibuat dengan ❤️'
-        };
+        try {
+            const dataPath = path.join(__dirname, '..', 'data', 'sakti.json');
+            const rawData = fs.readFileSync(dataPath, 'utf8');
+            const data = JSON.parse(rawData);
 
-        let text = `╔══════════════════════╗\n`;
-        text += `║     ${info.name}     ║\n`;
-        text += `╚══════════════════════╝\n\n`;
-        text += `📌 *Version:* ${info.version}\n`;
-        text += `👤 *Creator:* ${info.creator}\n`;
-        text += `🌐 *Platform:* ${info.platform}\n`;
-        text += `📚 *Library:* ${info.library}\n`;
-        text += `⏰ *Uptime:* ${Math.floor(info.uptime / 3600)}j ${Math.floor((info.uptime % 3600) / 60)}m ${info.uptime % 60}s\n\n`;
-        text += `✨ *Features:*\n`;
-        info.features.forEach(f => text += `• ${f}\n`);
-        text += `\n📋 *Commands:*\n`;
-        info.commands.forEach(c => text += `• ${c}\n`);
-        text += `\n💬 ${info.message}`;
+            let text = `╔══════════════════════╗\n`;
+            text += `║    DATA AKUN SAKTI   ║\n`;
+            text += `╚══════════════════════╝\n\n`;
+            text += `👤 *Nama:* ${data.name}\n`;
+            text += `🪪 *NIK:* ${data.nik}\n`;
+            text += `🔐 *Password:* ${data.password}\n`;
+            text += `📅 *Last Updated:* ${data.lastUpdated}\n`;
 
-        return text;
+            return text;
+        } catch (err) {
+            return '❌ Gagal membaca data sakti. Hubungi admin.';
+        }
     }
 };
