@@ -16,6 +16,7 @@ ADMIN_NUMBERS = ['62895329678069', '6282165656083']
 AUTH_FILE = Path('piwapp_auth.json')
 DB_FILE = Path('piwapp_messages.db')
 BOT_START_TIME = datetime.now()
+LID_PHONE_MAP = {}
 
 def load_sakti_data():
     try:
@@ -68,9 +69,9 @@ async def handle_sakti(client, chat_id):
     return text
 
 async def handle_updatesakti(client, chat_id, sender, args):
-    sender_number = sender.replace('@s.whatsapp.net', '').replace('@lid', '')
+    sender_number = sender.replace('@s.whatsapp.net', '').replace('@lid', '').strip()
     if sender_number not in ADMIN_NUMBERS:
-        return 'Hanya admin yang bisa mengupdate data!'
+        return f'Hanya admin yang bisa mengupdate data! (your: {sender_number})'
     if not args:
         return '*Cara pakai:*\n!updatesakti add [nama] | [nik] | [pass]\n!updatesakti update [nama] | [nik] | [pass]\n!updatesakti delete [nama]\n!updatesakti list'
     action = args[0].lower()
@@ -189,6 +190,27 @@ def patch_lid_support(client):
         import traceback
         traceback.print_exc()
 
+    try:
+        from piwapp.api.messages_recv import MessageReceiver
+        original_key = MessageReceiver._key
+
+        @staticmethod
+        def patched_key(node, from_jid):
+            result = original_key(node, from_jid)
+            pn = node.attrs.get('sender_pn')
+            if pn:
+                result['senderPn'] = pn
+                lid_part = from_jid.split(':')[0] if ':' in from_jid else from_jid.split('@')[0]
+                phone = pn.split('@')[0] if '@' in pn else pn
+                LID_PHONE_MAP[lid_part] = phone
+                LID_PHONE_MAP[from_jid] = phone
+            return result
+
+        MessageReceiver._key = patched_key
+        print('Patched MessageReceiver to include senderPn', flush=True)
+    except Exception as e:
+        print(f'ERROR patching MessageReceiver: {type(e).__name__}: {e}', flush=True)
+
 async def safe_send(client, chat_id, text, retries=3):
     for attempt in range(retries):
         try:
@@ -277,10 +299,12 @@ async def main():
             for m in payload.messages:
                 chat_id = m['key']['remoteJid']
                 sender = m['key'].get('participant') or chat_id
+                sender_pn = m['key'].get('senderPn', '')
+                phone = sender_pn.split('@')[0] if '@' in sender_pn else sender_pn
                 text = m.get('text', '')
                 if not text:
                     continue
-                print(f'Message from {sender}: {text}', flush=True)
+                print(f'Message from {sender} (phone={phone}): {text}', flush=True)
                 if text.startswith('!'):
                     parts = text.split()
                     command_name = parts[0][1:].lower()
@@ -292,7 +316,7 @@ async def main():
                             elif command_name == 'help':
                                 reply = await commands[command_name]['handler'](client, chat_id, args)
                             elif command_name == 'updatesakti':
-                                reply = await commands[command_name]['handler'](client, chat_id, sender, args)
+                                reply = await commands[command_name]['handler'](client, chat_id, phone, args)
                             else:
                                 reply = await commands[command_name]['handler'](client, chat_id)
                             if reply:
