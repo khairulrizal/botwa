@@ -27,8 +27,21 @@ const startBot = async () => {
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
-            log('info', 'QR Code received. Use pairing code instead.');
+        // Request pairing code when QR is received (first-time setup)
+        if (qr && !pairingRequested) {
+            pairingRequested = true;
+            log('info', 'QR Code received. Requesting pairing code...');
+            try {
+                const phoneNumber = '62895329678069';
+                const code = await sock.requestPairingCode(phoneNumber);
+                log('info', '========================================');
+                log('info', `PAIRING CODE: ${code}`);
+                log('info', '========================================');
+                log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
+                log('info', 'Masukkan kode di atas');
+            } catch (err) {
+                log('error', 'Failed to request pairing code:', err.message);
+            }
         }
 
         if (connection === 'close') {
@@ -45,22 +58,6 @@ const startBot = async () => {
             }
         } else if (connection === 'open') {
             log('info', 'Bot connected successfully!');
-            
-            // Request pairing code for first-time setup
-            if (!state.creds.registered && !pairingRequested) {
-                pairingRequested = true;
-                try {
-                    const phoneNumber = '62895329678069';
-                    const code = await sock.requestPairingCode(phoneNumber);
-                    log('info', '========================================');
-                    log('info', `PAIRING CODE: ${code}`);
-                    log('info', '========================================');
-                    log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
-                    log('info', 'Masukkan kode di atas');
-                } catch (err) {
-                    log('error', 'Failed to request pairing code:', err.message);
-                }
-            }
         }
     });
 
