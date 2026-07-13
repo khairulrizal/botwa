@@ -65,6 +65,39 @@ const startBot = async () => {
 
                 if (!messageText) return;
 
+                if (messageText.startsWith('!')) {
+                    const parts = messageText.split(' ');
+                    const commandName = parts[0].slice(1).toLowerCase();
+                    const args = parts.slice(1);
+                    const command = commands[commandName];
+
+                    if (command) {
+                        const context = {
+                            chatId,
+                            senderId,
+                            isGroup,
+                            message: msg,
+                            startTime: BOT_START_TIME,
+                            commands,
+                        };
+
+                        log('info', `Message from ${senderId} in ${isGroup ? 'group' : 'private'}: ${messageText}`);
+                        const start = Date.now();
+                        try {
+                            const reply = await command.execute(sock, msg, args, context);
+                            const elapsed = Date.now() - start;
+                            if (reply) {
+                                await sock.sendMessage(chatId, { text: reply });
+                                log('info', `Command !${commandName} executed in ${elapsed}ms`);
+                            }
+                        } catch (cmdError) {
+                            log('error', `Error executing !${commandName}:`, cmdError.message);
+                            await sock.sendMessage(chatId, { text: `Error: ${cmdError.message}` });
+                        }
+                        return;
+                    }
+                }
+
                 const autoReplyResponse = autoreply.check(messageText);
                 if (autoReplyResponse) {
                     await sock.sendMessage(chatId, { text: autoReplyResponse });
