@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import base64
 from pathlib import Path
 from datetime import datetime
 import qrcode
@@ -10,16 +11,12 @@ from piwapp import Client, ConnectionConfig, AuthenticationCreds
 from piwapp.events import WAEventType
 from aiohttp import web
 
-# Configuration
 PHONE_NUMBER = os.getenv('PHONE_NUMBER', '62895329678069')
 ADMIN_NUMBERS = ['62895329678069', '6282165656083']
 AUTH_FILE = Path('piwapp_auth.json')
 DB_FILE = Path('piwapp_messages.db')
-
-# Bot start time
 BOT_START_TIME = datetime.now()
 
-# Load sakti data
 def load_sakti_data():
     try:
         with open('data/sakti.json', 'r') as f:
@@ -31,7 +28,6 @@ def save_sakti_data(data):
     with open('data/sakti.json', 'w') as f:
         json.dump(data, f, indent=4)
 
-# Command handlers
 async def handle_ping(client, chat_id):
     return 'Pong!'
 
@@ -46,25 +42,11 @@ async def handle_alive(client, chat_id):
     hours = int(uptime.total_seconds() // 3600)
     minutes = int((uptime.total_seconds() % 3600) // 60)
     seconds = int(uptime.total_seconds() % 60)
-    
-    return f'''*BOT STATUS*
-
-⏰ Uptime: {hours}j {minutes}m {seconds}s
-✅ Status: Online
-🤖 Version: 1.0.0
-🐍 Library: piwapp (Python)'''
+    return f'*BOT STATUS*\n\nUptime: {hours}j {minutes}m {seconds}s\nStatus: Online\nVersion: 1.0.0\nLibrary: piwapp (Python)'
 
 async def handle_help(client, chat_id, args):
     if not args:
-        return '''*HELP*
-
-!help [command] - Tampilkan bantuan
-!ping - Cek bot hidup
-!menu - Tampilkan menu
-!alive - Status bot
-!sakti - Data akun sakti
-!updatesakti - Update data (admin)'''
-    
+        return '*HELP*\n\n!help [command]\n!ping - Cek bot hidup\n!menu - Tampilkan menu\n!alive - Status bot\n!sakti - Data akun sakti\n!updatesakti - Update data (admin)'
     command = args[0]
     help_text = {
         'ping': '!ping - Cek bot hidup',
@@ -79,139 +61,143 @@ async def handle_sakti(client, chat_id):
     data = load_sakti_data()
     if not data:
         return 'Database kosong!'
-    
     text = '*DATA AKUN SAKTI*\n\n'
     for i, user in enumerate(data, 1):
-        text += f'*{i}. {user["name"]}*\n'
-        text += f'NIK: {user["nik"]}\n'
-        text += f'Password: {user["password"]}\n\n'
-    
-    text += '─────────────────\n'
-    text += '*Untuk copy:* Tekan lama pada NIK/Password'
+        text += f'*{i}. {user["name"]}*\nNIK: {user["nik"]}\nPassword: {user["password"]}\n\n'
+    text += 'Tekan lama pada NIK/Password untuk copy'
     return text
 
 async def handle_updatesakti(client, chat_id, sender, args):
-    sender_number = sender.replace('@s.whatsapp.net', '')
+    sender_number = sender.replace('@s.whatsapp.net', '').replace('@lid', '')
     if sender_number not in ADMIN_NUMBERS:
         return 'Hanya admin yang bisa mengupdate data!'
-    
     if not args:
-        return '''*Cara penggunaan:*
-!updatesakti add [nama] | [nik] | [password]
-!updatesakti update [nama] | [nik] | [password]
-!updatesakti delete [nama]
-!updatesakti list'''
-    
+        return '*Cara pakai:*\n!updatesakti add [nama] | [nik] | [pass]\n!updatesakti update [nama] | [nik] | [pass]\n!updatesakti delete [nama]\n!updatesakti list'
     action = args[0].lower()
     data = load_sakti_data()
-    
     if action == 'add':
         rest = ' '.join(args[1:])
         parts = [p.strip() for p in rest.split('|')]
         if len(parts) < 3:
             return 'Format: !updatesakti add [nama] | [nik] | [password]'
-        
         name, nik, password = parts
         if any(u['nik'] == nik for u in data):
-            return f'NIK {nik} sudah ada di database!'
-        
+            return f'NIK {nik} sudah ada!'
         data.append({'name': name, 'nik': nik, 'password': password})
         save_sakti_data(data)
-        return f'Berhasil menambahkan:\n*{name}*\nNIK: {nik}'
-    
+        return f'Berhasil tambah:\n*{name}*\nNIK: {nik}'
     elif action == 'update':
         rest = ' '.join(args[1:])
         parts = [p.strip() for p in rest.split('|')]
         if len(parts) < 3:
             return 'Format: !updatesakti update [nama] | [nik] | [password]'
-        
         name, nik, password = parts
         index = next((i for i, u in enumerate(data) if u['name'].lower() == name.lower()), None)
         if index is None:
             return f'User "{name}" tidak ditemukan!'
-        
         data[index] = {'name': name, 'nik': nik, 'password': password}
         save_sakti_data(data)
-        return f'Berhasil update data:\n*{name}*\nNIK: {nik}'
-    
+        return f'Berhasil update:\n*{name}*\nNIK: {nik}'
     elif action == 'delete':
         name = ' '.join(args[1:])
         if not name:
             return 'Format: !updatesakti delete [nama]'
-        
         index = next((i for i, u in enumerate(data) if u['name'].lower() == name.lower()), None)
         if index is None:
             return f'User "{name}" tidak ditemukan!'
-        
         deleted = data.pop(index)
         save_sakti_data(data)
-        return f'Berhasil menghapus: *{deleted["name"]}*'
-    
+        return f'Berhasil hapus: *{deleted["name"]}*'
     elif action == 'list':
         if not data:
             return 'Database kosong!'
-        
-        text = '*DAFTAR AKUN SAKTI:*\n\n'
+        text = '*DAFTAR AKUN:*\n\n'
         for i, user in enumerate(data, 1):
             text += f'{i}. {user["name"]}\n'
         return text
-    
     else:
-        return 'Action tidak valid! Gunakan: add, update, delete, list'
+        return 'Gunakan: add, update, delete, list'
 
-# Auto-reply keywords
 AUTO_REPLY = {
-    'halo': 'Halo! Ada yang bisa saya bantu?',
-    'info': 'Ketik !menu untuk melihat perintah yang tersedia'
+    'halo': 'Halo! Ketik !menu untuk perintah.',
+    'info': 'Ketik !menu untuk melihat perintah.'
 }
+
+def resolve_lid(client, chat_id):
+    if '@s.whatsapp.net' in chat_id:
+        return chat_id
+    if '@lid' in chat_id:
+        lid_key = chat_id.split(':')[0].split('@')[0] if ':' in chat_id else chat_id.split('@')[0]
+        try:
+            for jid, contact in client.store.contacts.items():
+                c_str = str(contact)
+                if lid_key in c_str and '@s.whatsapp.net' in jid:
+                    return jid
+        except:
+            pass
+    return chat_id
+
+async def safe_send(client, chat_id, text, retries=3):
+    target = resolve_lid(client, chat_id)
+    for attempt in range(retries):
+        try:
+            await client.send_text(target, text)
+            print(f'Sent to {target} (from {chat_id})', flush=True)
+            return True
+        except Exception as e:
+            print(f'Send attempt {attempt+1} failed ({target}): {e}', flush=True)
+            if attempt < retries - 1:
+                await asyncio.sleep(3)
+    return False
 
 async def main():
     print('Bot main() started', flush=True)
     os.makedirs('data', exist_ok=True)
-    
-    # QR image holder for web server
+
     qr_image_bytes = [None]
     qr_status = ['waiting']
-    
-    # Web server to serve QR code
+
     async def handle_index(request):
         if qr_status[0] == 'connected':
-            return web.Response(text='<h1>Bot Connected!</h1><p>QR sudah di-scan. Bot online.</p>', content_type='text/html')
+            return web.Response(text='<h1>Bot Connected!</h1><p>Bot online.</p>', content_type='text/html')
         if qr_image_bytes[0]:
             return web.Response(body=qr_image_bytes[0], content_type='image/png')
-        return web.Response(text='<h1>Menunggu QR code...</h1><p>Muat ulang halaman ini.</p>', content_type='text/html')
-    
+        return web.Response(text='<h1>Menunggu QR code...</h1><p>Muat ulang.</p>', content_type='text/html')
+
     app = web.Application()
     app.router.add_get('/', handle_index)
-    
     port = int(os.getenv('PORT', '8080'))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f'Web server running on port {port}', flush=True)
-    print(f'Buka URL Railway untuk scan QR code!', flush=True)
-    
-    # Create auth if not exists
+    print(f'Web server on port {port}', flush=True)
+
+    def save_auth(c):
+        AUTH_FILE.write_text(c.to_json())
+        print('Auth updated. Copy this PIWAPP_AUTH_B64 to Railway env var:', flush=True)
+        print(f'PIWAPP_AUTH_B64={base64.b64encode(c.to_json().encode()).decode()}', flush=True)
+
     if AUTH_FILE.exists():
-        print('Loading existing auth...')
+        print('Loading auth from file...', flush=True)
         creds = AuthenticationCreds.from_json(AUTH_FILE.read_text())
+    elif os.getenv('PIWAPP_AUTH_B64'):
+        print('Loading auth from env var...', flush=True)
+        creds = AuthenticationCreds.from_json(base64.b64decode(os.getenv('PIWAPP_AUTH_B64')).decode())
     else:
-        print('Creating new auth...')
+        print('Creating new auth...', flush=True)
         creds = AuthenticationCreds.initial()
         AUTH_FILE.write_text(creds.to_json())
-    
-    # Initialize client
-    print('Initializing piwapp client...')
+
+    print('Initializing piwapp client...', flush=True)
     client = Client(
         creds,
         ConnectionConfig(),
-        on_creds_update=lambda c: AUTH_FILE.write_text(c.to_json()),
+        on_creds_update=save_auth,
         keys_path='piwapp_auth.json.keys',
         db_path=str(DB_FILE),
     )
-    
-    # Commands registry
+
     commands = {
         'ping': {'handler': handle_ping, 'description': 'Cek bot hidup'},
         'menu': {'handler': handle_menu, 'description': 'Tampilkan menu'},
@@ -220,26 +206,20 @@ async def main():
         'sakti': {'handler': handle_sakti, 'description': 'Data akun sakti'},
         'updatesakti': {'handler': handle_updatesakti, 'description': 'Update data (admin)'},
     }
-    
-    # Message handler
+
     async def on_messages(payload):
         try:
             for m in payload.messages:
                 chat_id = m['key']['remoteJid']
                 sender = m['key'].get('participant') or chat_id
                 text = m.get('text', '')
-                
                 if not text:
                     continue
-                
                 print(f'Message from {sender}: {text}', flush=True)
-                
-                # Handle commands
                 if text.startswith('!'):
                     parts = text.split()
                     command_name = parts[0][1:].lower()
                     args = parts[1:]
-                    
                     if command_name in commands:
                         try:
                             if command_name == 'menu':
@@ -250,63 +230,39 @@ async def main():
                                 reply = await commands[command_name]['handler'](client, chat_id, sender, args)
                             else:
                                 reply = await commands[command_name]['handler'](client, chat_id)
-                            
                             if reply:
-                                for attempt in range(3):
-                                    try:
-                                        await client.send_text(chat_id, reply)
-                                        print(f'Replied to {sender}', flush=True)
-                                        break
-                                    except Exception as send_err:
-                                        print(f'Send attempt {attempt+1} failed: {send_err}', flush=True)
-                                        if attempt < 2:
-                                            await asyncio.sleep(3)
+                                await safe_send(client, chat_id, reply)
                         except Exception as e:
                             print(f'Error handling command: {e}', flush=True)
                     return
-                
-                # Auto-reply
                 text_lower = text.lower()
                 for keyword, reply in AUTO_REPLY.items():
                     if keyword in text_lower:
-                        for attempt in range(3):
-                            try:
-                                await client.send_text(chat_id, reply)
-                                print(f'Auto-reply to {sender}', flush=True)
-                                break
-                            except Exception as send_err:
-                                print(f'Auto-reply attempt {attempt+1} failed: {send_err}', flush=True)
-                                if attempt < 2:
-                                    await asyncio.sleep(3)
+                        await safe_send(client, chat_id, reply)
                         return
         except Exception as e:
             print(f'Error in message handler: {e}', flush=True)
-    
-    # Connection handler
+
     async def on_connection(update):
         if 'qr' in update:
             qr_data = update['qr']
-            # Generate QR PNG
             img = qrcode.make(qr_data)
             buf = io.BytesIO()
             img.save(buf, format='PNG')
             qr_image_bytes[0] = buf.getvalue()
             qr_status[0] = 'qr_ready'
-            print('QR code updated! Buka URL Railway untuk scan.', flush=True)
+            print('QR ready! Open Railway URL to scan.', flush=True)
         if update.get('connection') == 'open':
             qr_status[0] = 'connected'
-            print('Bot connected successfully!', flush=True)
+            print('Bot connected!', flush=True)
         if update.get('connection') == 'close':
             qr_status[0] = 'waiting'
             print('Connection closed. Reconnecting...', flush=True)
 
-    # Register event handlers
     client.on("connection.update", on_connection)
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
-    
-    # Start client
+
     print('Starting bot...', flush=True)
-    print('Waiting for QR code...', flush=True)
     await client.start()
 
 if __name__ == '__main__':
