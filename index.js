@@ -1,5 +1,6 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const { loadCommands } = require('./commands');
+const autoreply = require('./commands/autoreply');
 
 const BOT_START_TIME = Date.now();
 
@@ -63,6 +64,13 @@ const startBot = async () => {
                 }
 
                 if (!messageText) return;
+
+                const autoReplyResponse = autoreply.check(messageText);
+                if (autoReplyResponse) {
+                    await sock.sendMessage(chatId, { text: autoReplyResponse });
+                    log('info', `Auto-reply triggered for: ${messageText}`);
+                    return;
+                }
 
                 const context = {
                     chatId,
