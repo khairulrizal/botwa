@@ -1,9 +1,14 @@
 module.exports = {
     name: 'menu',
     description: 'Show available commands',
-    execute: (sock, message) => {
+    execute: async (sock, message, args, context) => {
+        const commands = context.commands;
+        const commandList = Object.values(commands)
+            .map(cmd => `• !${cmd.name} - ${cmd.description}`)
+            .join('\n');
+
         return `📋 *Bot Menu*\n\n` +
-               `!ping - Check if bot is alive\n` +
-               `!menu - Show this menu\n`;
+               `${commandList}\n\n` +
+               `Total commands: ${Object.keys(commands).length}`;
     }
 };
