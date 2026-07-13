@@ -4,9 +4,11 @@ import os
 from pathlib import Path
 from datetime import datetime
 import qrcode
+import io
 
 from piwapp import Client, ConnectionConfig, AuthenticationCreds
 from piwapp.events import WAEventType
+from aiohttp import web
 
 # Configuration
 PHONE_NUMBER = os.getenv('PHONE_NUMBER', '62895329678069')
@@ -165,8 +167,30 @@ AUTO_REPLY = {
 
 async def main():
     print('Bot main() started', flush=True)
-    # Create data directory
     os.makedirs('data', exist_ok=True)
+    
+    # QR image holder for web server
+    qr_image_bytes = [None]
+    qr_status = ['waiting']
+    
+    # Web server to serve QR code
+    async def handle_index(request):
+        if qr_status[0] == 'connected':
+            return web.Response(text='<h1>Bot Connected!</h1><p>QR sudah di-scan. Bot online.</p>', content_type='text/html')
+        if qr_image_bytes[0]:
+            return web.Response(body=qr_image_bytes[0], content_type='image/png')
+        return web.Response(text='<h1>Menunggu QR code...</h1><p>Muat ulang halaman ini.</p>', content_type='text/html')
+    
+    app = web.Application()
+    app.router.add_get('/', handle_index)
+    
+    port = int(os.getenv('PORT', '8080'))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f'Web server running on port {port}', flush=True)
+    print(f'Buka URL Railway untuk scan QR code!', flush=True)
     
     # Create auth if not exists
     if AUTH_FILE.exists():
@@ -208,7 +232,7 @@ async def main():
                 if not text:
                     continue
                 
-                print(f'Message from {sender}: {text}')
+                print(f'Message from {sender}: {text}', flush=True)
                 
                 # Handle commands
                 if text.startswith('!'):
@@ -229,9 +253,9 @@ async def main():
                             
                             if reply:
                                 await client.send_text(chat_id, reply)
-                                print(f'Replied to {sender}')
+                                print(f'Replied to {sender}', flush=True)
                         except Exception as e:
-                            print(f'Error handling command: {e}')
+                            print(f'Error handling command: {e}', flush=True)
                             await client.send_text(chat_id, f'Error: {str(e)}')
                     return
                 
@@ -240,34 +264,27 @@ async def main():
                 for keyword, reply in AUTO_REPLY.items():
                     if keyword in text_lower:
                         await client.send_text(chat_id, reply)
-                        print(f'Auto-reply to {sender}')
+                        print(f'Auto-reply to {sender}', flush=True)
                         return
         except Exception as e:
-            print(f'Error in message handler: {e}')
+            print(f'Error in message handler: {e}', flush=True)
     
     # Connection handler
     async def on_connection(update):
         if 'qr' in update:
             qr_data = update['qr']
-            print('', flush=True)
-            print('=' * 40, flush=True)
-            print('  SCAN QR CODE INI DENGAN WHATSAPP', flush=True)
-            print('=' * 40, flush=True)
-            qr = qrcode.QRCode(version=1, box_size=1, border=2)
-            qr.add_data(qr_data)
-            qr.make(fit=True)
-            matrix = qr.get_matrix()
-            for row in matrix:
-                line = ''.join('██' if cell else '  ' for cell in row)
-                print(line, flush=True)
-            print('=' * 40, flush=True)
-            print('Buka WhatsApp → Linked Devices', flush=True)
-            print('→ Link a Device → Scan QR di atas', flush=True)
-            print('=' * 40, flush=True)
-            print('', flush=True)
+            # Generate QR PNG
+            img = qrcode.make(qr_data)
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            qr_image_bytes[0] = buf.getvalue()
+            qr_status[0] = 'qr_ready'
+            print('QR code updated! Buka URL Railway untuk scan.', flush=True)
         if update.get('connection') == 'open':
+            qr_status[0] = 'connected'
             print('Bot connected successfully!', flush=True)
         if update.get('connection') == 'close':
+            qr_status[0] = 'waiting'
             print('Connection closed. Reconnecting...', flush=True)
 
     # Register event handlers
@@ -275,8 +292,8 @@ async def main():
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
     
     # Start client
-    print('Starting bot...')
-    print('Waiting for QR code...')
+    print('Starting bot...', flush=True)
+    print('Waiting for QR code...', flush=True)
     await client.start()
 
 if __name__ == '__main__':

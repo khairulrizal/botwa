@@ -1,2 +1,3 @@
 piwapp>=0.1.0
 qrcode[pil]
+aiohttp
