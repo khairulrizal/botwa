@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ADMIN_NUMBER = '62895329678069';
+const ADMIN_NUMBERS = ['62895329678069', '6282165656083'];
 
 const dataPath = path.join(__dirname, '..', 'data', 'sakti.json');
 
@@ -25,7 +25,7 @@ module.exports = {
         const sender = message.key.participant || message.key.remoteJid;
         const senderNumber = sender.replace(/@.*$/, '');
 
-        if (senderNumber !== ADMIN_NUMBER.replace('+', '')) {
+        if (!ADMIN_NUMBERS.includes(senderNumber)) {
             return 'Hanya admin yang bisa mengupdate data!';
         }
 
