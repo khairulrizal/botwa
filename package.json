@@ -1,16 +1,20 @@
 {
   "name": "botwa",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp Bot using Baileys",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "dev": "node --watch index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["whatsapp", "bot", "baileys"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc13"
   }
