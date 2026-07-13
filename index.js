@@ -22,7 +22,9 @@ const startBot = async () => {
         version,
         auth: state,
         printQRInTerminal: false,
-        browser: ['BOT SAKTI', 'Chrome', '1.0.0'],
+        browser: ['Chrome', 'Safari', '1.0.0'],
+        markOnlineOnConnect: false,
+        syncFullHistory: false,
     });
 
     let pairingRequested = false;
