@@ -3,6 +3,8 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
+import qrcode
+import qrcode.constants
 
 from piwapp import Client, ConnectionConfig, AuthenticationCreds
 from piwapp.events import WAEventType
@@ -163,17 +165,20 @@ AUTO_REPLY = {
 }
 
 async def main():
-    # Create auth if not exists
-    if AUTH_FILE.exists():
-        creds = AuthenticationCreds.from_json(AUTH_FILE.read_text())
-    else:
-        creds = AuthenticationCreds.initial()
-        AUTH_FILE.write_text(creds.to_json())
-    
     # Create data directory
     os.makedirs('data', exist_ok=True)
     
+    # Create auth if not exists
+    if AUTH_FILE.exists():
+        print('Loading existing auth...')
+        creds = AuthenticationCreds.from_json(AUTH_FILE.read_text())
+    else:
+        print('Creating new auth...')
+        creds = AuthenticationCreds.initial()
+        AUTH_FILE.write_text(creds.to_json())
+    
     # Initialize client
+    print('Initializing piwapp client...')
     client = Client(
         creds,
         ConnectionConfig(),
@@ -194,58 +199,61 @@ async def main():
     
     # Message handler
     async def on_messages(payload):
-        for m in payload.messages:
-            chat_id = m['key']['remoteJid']
-            sender = m['key'].get('participant') or chat_id
-            text = m.get('text', '')
-            
-            if not text:
-                continue
-            
-            # Handle commands
-            if text.startswith('!'):
-                parts = text.split()
-                command_name = parts[0][1:].lower()
-                args = parts[1:]
+        try:
+            for m in payload.messages:
+                chat_id = m['key']['remoteJid']
+                sender = m['key'].get('participant') or chat_id
+                text = m.get('text', '')
                 
-                if command_name in commands:
-                    try:
-                        if command_name == 'menu':
-                            reply = await commands[command_name]['handler'](client, chat_id, commands)
-                        elif command_name == 'help':
-                            reply = await commands[command_name]['handler'](client, chat_id, args)
-                        elif command_name == 'updatesakti':
-                            reply = await commands[command_name]['handler'](client, chat_id, sender, args)
-                        else:
-                            reply = await commands[command_name]['handler'](client, chat_id)
-                        
-                        if reply:
-                            await client.send_text(chat_id, reply)
-                    except Exception as e:
-                        await client.send_text(chat_id, f'Error: {str(e)}')
-                return
-            
-            # Auto-reply
-            text_lower = text.lower()
-            for keyword, reply in AUTO_REPLY.items():
-                if keyword in text_lower:
-                    await client.send_text(chat_id, reply)
+                if not text:
+                    continue
+                
+                print(f'Message from {sender}: {text}')
+                
+                # Handle commands
+                if text.startswith('!'):
+                    parts = text.split()
+                    command_name = parts[0][1:].lower()
+                    args = parts[1:]
+                    
+                    if command_name in commands:
+                        try:
+                            if command_name == 'menu':
+                                reply = await commands[command_name]['handler'](client, chat_id, commands)
+                            elif command_name == 'help':
+                                reply = await commands[command_name]['handler'](client, chat_id, args)
+                            elif command_name == 'updatesakti':
+                                reply = await commands[command_name]['handler'](client, chat_id, sender, args)
+                            else:
+                                reply = await commands[command_name]['handler'](client, chat_id)
+                            
+                            if reply:
+                                await client.send_text(chat_id, reply)
+                                print(f'Replied to {sender}')
+                        except Exception as e:
+                            print(f'Error handling command: {e}')
+                            await client.send_text(chat_id, f'Error: {str(e)}')
                     return
+                
+                # Auto-reply
+                text_lower = text.lower()
+                for keyword, reply in AUTO_REPLY.items():
+                    if keyword in text_lower:
+                        await client.send_text(chat_id, reply)
+                        print(f'Auto-reply to {sender}')
+                        return
+        except Exception as e:
+            print(f'Error in message handler: {e}')
     
     # Register event handler
     client.events.on(WAEventType.MESSAGES_UPSERT, on_messages)
     
-    # Connection handler
-    async def on_connection(update):
-        if 'qr' in update:
-            print('QR Code received. Scan with WhatsApp app.')
-        if update.get('connection') == 'open':
-            print('Bot connected successfully!')
-    
+    # Register connection handler
     client.events.on(WAEventType.CONNECTION_UPDATE, on_connection)
     
     # Start client
     print('Starting bot...')
+    print('Waiting for QR code...')
     await client.start()
 
 if __name__ == '__main__':
