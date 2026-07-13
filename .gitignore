@@ -1,7 +1,15 @@
+# Node.js
 node_modules/
 auth_info_baileys/
 package-lock.json
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+piwapp_auth.json
+piwapp_auth.json.keys
+piwapp_messages.db
 .env
 *.log
-npm-debug.log*
 .DS_Store

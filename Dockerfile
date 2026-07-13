@@ -1,6 +1,14 @@
-FROM node:20-alpine
+FROM python:3.12-slim
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
-COPY . .
-CMD ["node", "index.js"]
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy bot files
+COPY bot.py .
+COPY data/ ./data/
+
+# Run bot
+CMD ["python", "bot.py"]
