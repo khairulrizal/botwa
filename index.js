@@ -20,11 +20,14 @@ const startBot = async () => {
     const sock = makeWASocket({
         version,
         auth: state,
-        printQRInTerminal: true,
     });
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            log('info', 'QR Code received. Use pairing code instead.');
+        }
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -41,6 +44,17 @@ const startBot = async () => {
             log('info', 'Bot connected successfully!');
         }
     });
+
+    // Request pairing code for first-time setup
+    if (!state.creds.registered) {
+        const phoneNumber = '62895329678069';
+        const code = await sock.requestPairingCode(phoneNumber);
+        log('info', '========================================');
+        log('info', `PAIRING CODE: ${code}`);
+        log('info', '========================================');
+        log('info', 'Buka WhatsApp → Linked Devices → Link with Phone Number');
+        log('info', 'Masukkan kode di atas');
+    }
 
     sock.ev.on('creds.update', saveCreds);
 
