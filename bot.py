@@ -138,46 +138,52 @@ def resolve_lid(client, chat_id):
     return chat_id
 
 def patch_lid_support(client):
-    """Monkey-patch _relay_dm to handle @lid JIDs that USync can't resolve."""
+    """Monkey-patch send_text to handle @lid JIDs that USync can't resolve."""
     from piwapp.binary import jids as _j
     from piwapp.api import messages_send as ms
-    from piwapp.api.messages import generate_message_id, encode_wa_message
-    from piwapp.binary import jid_decode, jid_encode, BinaryNode
+    from piwapp.api.messages import generate_message_id
+    from piwapp.binary import jid_decode, jid_encode
 
-    original_relay_dm = client._conn._relay_dm
+    original_send_text = client.send_text
 
-    async def patched_relay_dm(to_jid, message, msg_id, *, stanza_attrs=None, enc_attrs=None):
-        if not to_jid or not to_jid.endswith('@lid'):
-            return await original_relay_dm(to_jid, message, msg_id, stanza_attrs=stanza_attrs, enc_attrs=enc_attrs)
+    async def patched_send_text(to_jid, text):
+        if to_jid and '@lid' in to_jid:
+            conn = client._conn
+            if conn is None:
+                raise RuntimeError('Connection not ready')
+            print(f'[LID] Sending to {to_jid} (bypass USync)', flush=True)
+            msg_id = generate_message_id()
+            from piwapp.models.message import to_message_proto
+            message = to_message_proto(text)
+            me_id = conn.creds.me.id
+            me_dec = jid_decode(me_id)
+            me_user_jid = jid_encode(me_dec.user, "s.whatsapp.net")
+            recipient = _j.jid_normalized_user(to_jid)
 
-        print(f'[LID] Sending directly to {to_jid} (bypass USync)', flush=True)
-        me_id = client._conn.creds.me.id
-        me_dec = jid_decode(me_id)
-        me_user_jid = jid_encode(me_dec.user, "s.whatsapp.net")
-        recipient = _j.jid_normalized_user(to_jid)
+            targets = [recipient]
 
-        targets = [recipient]
+            from piwapp.crypto.double_ratchet import SessionBuilder, SessionCipher
+            for d in targets:
+                if not conn.signal_store.contains_session(d):
+                    try:
+                        bundles = ms.parse_prekey_bundles(
+                            await conn.query(ms.build_prekey_fetch([d], generate_message_tag())))
+                        ms.inject_sessions(conn.signal_store, bundles)
+                    except Exception as e:
+                        print(f'[LID] Pre-key fetch failed for {d}: {e}', flush=True)
 
-        from piwapp.crypto.double_ratchet import SessionBuilder, SessionCipher
-        for d in targets:
-            if not client._conn.signal_store.contains_session(d):
-                try:
-                    bundles = ms.parse_prekey_bundles(
-                        await client._conn.query(ms.build_prekey_fetch([d], generate_message_tag())))
-                    ms.inject_sessions(client._conn.signal_store, bundles)
-                except Exception as e:
-                    print(f'[LID] Pre-key fetch failed for {d}: {e}', flush=True)
+            other_nodes, di1 = ms.create_participant_nodes(conn.signal_store, message, targets)
+            stanza = ms.build_message_stanza(
+                msg_id, recipient, other_nodes,
+                include_device_identity=di1, creds=conn.creds,
+            )
+            await conn._send_node(stanza)
+            print(f'[LID] Sent to {to_jid}', flush=True)
+            return msg_id
+        return await original_send_text(to_jid, text)
 
-        other_nodes, di1 = ms.create_participant_nodes(client._conn.signal_store, message, targets, enc_attrs)
-        stanza = ms.build_message_stanza(
-            msg_id, recipient, other_nodes,
-            include_device_identity=di1, creds=client._conn.creds, extra_attrs=stanza_attrs,
-        )
-        await client._conn._send_node(stanza)
-        print(f'[LID] Stanza sent to {to_jid}', flush=True)
-
-    client._conn._relay_dm = patched_relay_dm
-    print('Patched _relay_dm for LID support', flush=True)
+    client.send_text = patched_send_text
+    print('Patched send_text for LID support', flush=True)
 
 async def safe_send(client, chat_id, text, retries=3):
     for attempt in range(retries):
