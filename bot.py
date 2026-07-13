@@ -164,6 +164,7 @@ AUTO_REPLY = {
 }
 
 async def main():
+    print('Bot main() started', flush=True)
     # Create data directory
     os.makedirs('data', exist_ok=True)
     
@@ -274,4 +275,10 @@ async def main():
     await client.start()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        print('Bot starting...', flush=True)
+        asyncio.run(main())
+    except Exception as e:
+        print(f'FATAL ERROR: {e}', flush=True)
+        import traceback
+        traceback.print_exc()
