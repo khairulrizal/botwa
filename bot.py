@@ -252,24 +252,32 @@ async def main():
                                 reply = await commands[command_name]['handler'](client, chat_id)
                             
                             if reply:
-                                await client.send_text(chat_id, reply)
-                                print(f'Replied to {sender}', flush=True)
+                                for attempt in range(3):
+                                    try:
+                                        await client.send_text(chat_id, reply)
+                                        print(f'Replied to {sender}', flush=True)
+                                        break
+                                    except Exception as send_err:
+                                        print(f'Send attempt {attempt+1} failed: {send_err}', flush=True)
+                                        if attempt < 2:
+                                            await asyncio.sleep(3)
                         except Exception as e:
-                            import traceback
                             print(f'Error handling command: {e}', flush=True)
-                            traceback.print_exc()
-                            try:
-                                await client.send_text(chat_id, f'Error: {str(e)}')
-                            except Exception as e2:
-                                print(f'Failed to send error reply: {e2}', flush=True)
                     return
                 
                 # Auto-reply
                 text_lower = text.lower()
                 for keyword, reply in AUTO_REPLY.items():
                     if keyword in text_lower:
-                        await client.send_text(chat_id, reply)
-                        print(f'Auto-reply to {sender}', flush=True)
+                        for attempt in range(3):
+                            try:
+                                await client.send_text(chat_id, reply)
+                                print(f'Auto-reply to {sender}', flush=True)
+                                break
+                            except Exception as send_err:
+                                print(f'Auto-reply attempt {attempt+1} failed: {send_err}', flush=True)
+                                if attempt < 2:
+                                    await asyncio.sleep(3)
                         return
         except Exception as e:
             print(f'Error in message handler: {e}', flush=True)
