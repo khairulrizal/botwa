@@ -1,6 +1,27 @@
-{
-    "name": "Masukkan Nama",
-    "nik": "Masukkan NIK",
-    "password": "Masukkan Password",
-    "lastUpdated": "2026-07-13"
-}
+[
+    {
+        "name": "Maisarah, S.E",
+        "nik": "1172024205800002",
+        "password": "12345Sbg!!!"
+    },
+    {
+        "name": "Herizal",
+        "nik": "1106201108860002",
+        "password": "12345Sbg!!!"
+    },
+    {
+        "name": "Murdani",
+        "nik": "1172020503760001",
+        "password": "Sbg!12345"
+    },
+    {
+        "name": "Nuranifah",
+        "nik": "1171044511750004",
+        "password": "123456Sbg#"
+    },
+    {
+        "name": "Eriadi, S.T",
+        "nik": "1172010304740004",
+        "password": "12345Sbg!!!"
+    }
+]
